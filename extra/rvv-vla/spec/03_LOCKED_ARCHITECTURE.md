@@ -4,9 +4,9 @@ This file contains only decisions that should remain stable without performance 
 
 ## A. Backend identity
 
-**D-001 — implementation key:** `rvv`  
-**D-002 — namespace:** `simdjson::rvv`  
-**D-003 — preserve `rvv_vls`:** it remains a buildable reference/alternative.  
+**D-001 — implementation key:** `rvv`
+**D-002 — namespace:** `simdjson::rvv`
+**D-003 — preserve `rvv_vls`:** it remains a buildable reference/alternative.
 **D-004 — frozen development baseline:** start at v4.6.11 and rebase only at documented checkpoints.
 
 ## B. VLA and type safety
@@ -117,9 +117,9 @@ Do not hard-code `rvv` as universally preferred over `rvv_vls`. In build modes w
 
 ## J. Engineering/process
 
-**D-090 — minimal upstream switchboard changes.**  
-**D-091 — no unrelated refactors.**  
-**D-092 — performance claims require real hardware.**  
-**D-093 — QEMU is correctness-only.**  
-**D-094 — human review/understanding of AI-generated code is mandatory.**  
+**D-090 — minimal upstream switchboard changes.**
+**D-091 — no unrelated refactors.**
+**D-092 — performance claims require real hardware.**
+**D-093 — QEMU is correctness-only.**
+**D-094 — human review/understanding of AI-generated code is mandatory.**
 **D-095 — performance hypotheses cannot be silently promoted to architecture decisions.**

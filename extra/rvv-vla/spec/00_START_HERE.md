@@ -1,10 +1,10 @@
 # simdjson RVV-VLA Upgrade Specification
 
-**Spec version:** 1.1  
-**Frozen development baseline:** simdjson `v4.6.11`  
-**Target implementation key:** `rvv`  
-**Reference implementation:** upstream `rvv_vls`  
-**Old work source:** `feature/rvv-backend` snapshot, January 2026  
+**Spec version:** 1.1
+**Frozen development baseline:** simdjson `v4.6.11`
+**Target implementation key:** `rvv`
+**Reference implementation:** upstream `rvv_vls`
+**Old work source:** `feature/rvv-backend` snapshot, January 2026
 **Last upstream/research verification:** 2026-09-19
 
 ## Purpose
