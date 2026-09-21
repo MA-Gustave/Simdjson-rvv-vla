@@ -109,10 +109,14 @@ def require_tool(name):
     return path
 
 
-def compiler_setup(compiler, profile):
+def compiler_setup(compiler, profile, *, native=False):
     if compiler == "gcc":
-        cc = require_tool("riscv64-linux-gnu-gcc")
-        cxx = require_tool("riscv64-linux-gnu-g++")
+        if native:
+            cc = require_tool(os.environ.get("RVV_NATIVE_CC", "gcc"))
+            cxx = require_tool(os.environ.get("RVV_NATIVE_CXX", "g++"))
+        else:
+            cc = require_tool("riscv64-linux-gnu-gcc")
+            cxx = require_tool("riscv64-linux-gnu-g++")
         if profile == "dispatch":
             try:
                 major = int(output([cxx, "-dumpfullversion", "-dumpversion"]).split(".")[0])
@@ -123,8 +127,12 @@ def compiler_setup(compiler, profile):
                 raise SystemExit(PREREQ_MISSING)
         toolchain = "cmake/toolchains/rvv-vla-qemu-gcc.cmake"
     else:
-        cc = require_tool("clang")
-        cxx = require_tool("clang++")
+        if native:
+            cc = require_tool(os.environ.get("RVV_NATIVE_CLANG_CC", "clang"))
+            cxx = require_tool(os.environ.get("RVV_NATIVE_CLANG_CXX", "clang++"))
+        else:
+            cc = require_tool("clang")
+            cxx = require_tool("clang++")
         toolchain = "cmake/toolchains/rvv-vla-qemu-clang.cmake"
     return cc, cxx, toolchain
 
@@ -162,7 +170,7 @@ def main():
     if not is_native:
         require_tool("qemu-riscv64")
 
-    cc, cxx, toolchain = compiler_setup(args.compiler, args.profile)
+    cc, cxx, toolchain = compiler_setup(args.compiler, args.profile, native=is_native)
     sysroot = find_sysroot(cc)
 
     build = (root / args.build_root / f"{args.compiler}-{args.profile}").resolve()

@@ -2,7 +2,7 @@
 
 **Project:** simdjson RVV-VLA backend
 **Baseline:** simdjson v4.6.11 (`f5de14f`)
-**Branch:** `feature/rvv-vla`
+**Branch:** `main`
 **Last validated:** 2026-09-21
 **Status:** correctness-complete for the current second-wave optimized snapshot under GCC/Clang + QEMU at VLEN=128/256/512/1024; native performance validation pending
 
@@ -28,6 +28,7 @@ This document records only results that have actually been observed. It is not a
 | Upstream acceptance suite | **PASS** | GCC global: 89/89 tests pass at VLEN=128/256/512/1024. |
 | RepoDiag `rvv-full` | **PASS with warnings** | 9 PASS / 2 WARN / 0 FAIL / 0 ERROR. RVV levels R10/R20/R30/R40/R50 pass. |
 | RepoDiag `deep` | **PASS with warnings** | 10 PASS / 2 WARN / 0 FAIL / 0 ERROR. RVV levels R10/R20/R30/R40/R50 pass. |
+| Native VPS orchestration | PENDING | `scripts/rvv/native_suite.py` is prepared to qualify a real RVV host, run native correctness and collect benchmark logs; it has not yet been executed on target hardware. |
 | Real RISC-V hardware correctness | PENDING | QEMU is still the completed correctness environment for this snapshot. |
 | Real hardware performance | PENDING | No performance claim is valid yet; native RVV 1.0 benchmarking is the next phase. |
 
@@ -203,20 +204,39 @@ The current snapshot can therefore be described as VLA-correct across the tested
 
 This does **not** establish a performance advantage over upstream `rvv_vls`.
 
-## Next phase: native RVV performance validation
+## Next phase: native RVV hardware validation and performance
 
-The next phase is native benchmarking on real RISC-V Vector 1.0 hardware.
+The next phase is execution on real RISC-V Vector 1.0 hardware. The first
+target is expected to be a SpacemiT K1/X60 system with VLEN=256, such as
+cfarm95 / Banana Pi BPI-F3 or a native VPS exposing equivalent hardware.
 
-First target:
+The prepared high-level entry point is:
 
-- cfarm95 / Banana Pi BPI-F3
-- SpacemiT K1 / X60
-- VLEN=256
+```text
+scripts/rvv/native_suite.py
+```
 
-The benchmark must compare the current VLA backend against:
+It snapshots the host, checks native `riscv64` execution, probes hardware VLEN,
+runs selected native correctness gates, invokes the existing native performance
+harness and writes a timestamped summary plus a compact result bundle. It is
+prepared for the first hardware run but has not yet produced hardware evidence.
 
-- the upstream `rvv_vls` backend;
-- fallback;
+The recommended sequence on a new VPS is:
+
+```bash
+python3 scripts/rvv/native_suite.py --preset smoke
+python3 scripts/rvv/native_suite.py --preset phase1
+```
+
+`smoke` performs the minimum GCC native correctness and current-VLA benchmark
+bring-up. `phase1` adds GCC dispatch, optional Clang global correctness and the
+full isolated phase-1 A/B benchmark under GCC. Broader `matrix` and `standard`
+presets are available after the quick run is stable.
+
+The benchmark compares the current VLA backend against:
+
+- the pristine upstream `rvv_vls` backend at every usable fixed width;
+- current and upstream fallback controls;
 - the isolated VLA A/B variants.
 
 The primary workloads are:
@@ -227,13 +247,16 @@ The primary workloads are:
 - minify;
 - UTF-8 validation.
 
-The first native A/B campaign is:
+The native suite stores raw CSV, median/MAD summaries, machine/compiler/Git
+metadata and one log per step. The shareable result artifact is:
 
 ```text
-python3 scripts/rvv/perf/bench_native.py all --profile quick --compiler gcc --vla-variants phase1
+rvv-native-results.tar.gz
 ```
 
-The purpose of this run is to identify which of the second-wave transformations are genuine wins on the K1/X60 before combining or extending them.
+The purpose of the first phase-1 run is to identify which second-wave
+transformations are genuine wins on the K1/X60 before combining or extending
+them.
 
 Only after native measurements should the project decide whether to:
 
@@ -242,6 +265,24 @@ Only after native measurements should the project decide whether to:
 - test a wider `e8m4` Stage 1 configuration;
 - further optimize UTF-8 or minify paths;
 - remove or disable losing variants.
+
+## Prepared native tooling
+
+The native-suite update keeps one source of truth for each layer:
+
+- `scripts/rvv/run_tests.py` remains the correctness runner;
+- `scripts/rvv/perf/bench_native.py` remains the performance harness;
+- `scripts/rvv/native_suite.py` orchestrates qualification, correctness,
+  benchmarks and logging.
+
+On a native `riscv64` host, `run_tests.py` uses host `gcc/g++` or
+`clang/clang++` instead of requiring the cross-compiler executable names.
+Versioned compilers can be selected with `RVV_NATIVE_CC`, `RVV_NATIVE_CXX`,
+`RVV_NATIVE_CLANG_CC` and `RVV_NATIVE_CLANG_CXX`. Cross/QEMU behavior remains
+unchanged.
+
+Native performance preflight rejects QEMU/TCG-like execution by default and
+measures the actual hardware VLEN with `scripts/rvv/perf/probe_vlen.cpp`.
 
 ## Reproduction commands for the validated correctness gates
 
@@ -280,6 +321,34 @@ RepoDiag `deep`:
 ```text
 python ..\RepoDiagSimdjson\repodiag.py --target C:\mycode\Simdjson\simdjson-rvv-vla run deep --jobs 8
 ```
+
+## Native VPS commands (not yet executed)
+
+First bring-up:
+
+```text
+python3 scripts/rvv/native_suite.py --preset smoke
+```
+
+Recommended phase-1 campaign:
+
+```text
+python3 scripts/rvv/native_suite.py --preset phase1
+```
+
+Broader matrix after the quick run is stable:
+
+```text
+python3 scripts/rvv/native_suite.py --preset matrix
+```
+
+Normal longer benchmark campaign:
+
+```text
+python3 scripts/rvv/native_suite.py --preset standard
+```
+
+These commands remain **PENDING** until observed on real RVV hardware.
 
 ## Status policy
 

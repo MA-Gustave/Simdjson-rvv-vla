@@ -37,6 +37,11 @@ Properties:
 - direct structural-index emission
 - no required scalar per-byte primary path
 
+The current second-wave implementation also contains bounded packed-mask
+control paths. Sparse and packed writers are performance policies rather than
+VLA correctness limits; dense vector fallbacks remain available when thresholds
+or packed-mask capacity are exceeded.
+
 ## UTF-8
 
 `src/rvv/utf8_validation.h` implements scalable UTF-8 validation.
@@ -65,6 +70,27 @@ The design does not rely on SIGILL probing.
 Non-RISC-V builds must not require `<riscv_vector.h>`. Intrinsics are isolated to
 RVV implementation code so ordinary simdjson builds remain unaffected.
 
+The correctness runner also keeps cross/QEMU and native execution distinct. A
+native `riscv64` host uses its host compiler, while non-native correctness runs
+use the RISC-V cross toolchain and QEMU emulator.
+
+## Validation and performance isolation
+
+Correctness and performance evidence are deliberately separated:
+
+- QEMU is used to exercise multiple VLEN values and validate parser behavior;
+- native RVV 1.0 hardware is required for performance measurements;
+- native VLEN is measured by an executable RVV probe rather than assumed from
+  the provider description;
+- QEMU/TCG-like hosts are rejected by the performance harness by default;
+- native results retain compiler, Git, CPU-affinity, virtualization and raw
+  benchmark metadata.
+
+`scripts/rvv/native_suite.py` is the high-level native orchestration layer.
+It delegates correctness to `scripts/rvv/run_tests.py` and performance to
+`scripts/rvv/perf/bench_native.py`; it does not create a second implementation
+of either test system.
+
 ## Single-header
 
 `singleheader/simdjson.h` and `singleheader/simdjson.cpp` are included in the
@@ -78,5 +104,6 @@ The authoritative split is documented in:
 - `extra/rvv-vla/spec/21_PERFORMANCE_HYPOTHESES.md`
 
 Correct VLA semantics and parser behavior are invariants. LMUL choice,
-compaction details, escape propagation strategy, and related microarchitecture
-remain tunable unless explicitly locked by the specification.
+compaction details, escape propagation strategy, packed-control thresholds and
+related microarchitecture remain tunable unless explicitly locked by the
+specification.

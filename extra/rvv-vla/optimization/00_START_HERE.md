@@ -106,6 +106,7 @@ Do not implement all ideas at once. Preserve attribution of wins and regressions
 - `11_EXPERIMENT_QUEUE.md` — concrete experiment order and decision tree.
 - `12_FIRST_WAVE_IMPLEMENTED.md` — implemented optimization candidates awaiting native promotion evidence.
 - `13_PACKED_INDEX_AND_AB_HARNESS.md` — packed structural writer + isolated native A/B variants.
+- `14_NATIVE_VPS_SUITE.md` — one-command native VPS qualification, correctness matrix and benchmark logging.
 - `SOURCES.md` — external references used by this plan.
 
 ## Non-goals

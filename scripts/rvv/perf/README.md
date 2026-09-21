@@ -72,6 +72,22 @@ sudo apt install -y git cmake ninja-build build-essential python3 file
 
 For the tested GCC path, GCC 14+ is expected.
 
+
+## One-command VPS validation suite
+
+For the first run on a new RVV VPS, use the higher-level orchestrator from the
+repository root:
+
+```bash
+python3 scripts/rvv/native_suite.py --preset phase1
+```
+
+It snapshots the host, runs native RVV/VLEN preflights, executes the selected
+correctness matrix, calls this performance harness, and writes a timestamped
+`summary.md`, `summary.json`, per-step logs and a compact result bundle under
+`../rvv-native-runs/`. See
+`extra/rvv-vla/optimization/14_NATIVE_VPS_SUITE.md` for the preset matrix.
+
 ## One-command standard run
 
 From the **current RVV-VLA repository root**:

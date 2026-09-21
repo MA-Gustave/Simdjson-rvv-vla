@@ -146,9 +146,15 @@ def git_text(repo: Path, args: list[str]) -> str:
 
 def compiler_pair(kind: str) -> tuple[str, str]:
     if kind == "gcc":
-        return ("gcc", "g++")
+        return (
+            os.environ.get("RVV_NATIVE_CC", "gcc"),
+            os.environ.get("RVV_NATIVE_CXX", "g++"),
+        )
     if kind == "clang":
-        return ("clang", "clang++")
+        return (
+            os.environ.get("RVV_NATIVE_CLANG_CC", "clang"),
+            os.environ.get("RVV_NATIVE_CLANG_CXX", "clang++"),
+        )
     raise ValueError(kind)
 
 def compiler_version(cxx: str) -> str:
