@@ -12,6 +12,35 @@ namespace simdjson {
 namespace rvv {
 namespace stage1 {
 
+#ifndef SIMDJSON_RVV_SPARSE_INDEX_THRESHOLD
+#define SIMDJSON_RVV_SPARSE_INDEX_THRESHOLD 8
+#endif
+#ifndef SIMDJSON_RVV_ENABLE_PACKED_INDEX_WRITER
+#define SIMDJSON_RVV_ENABLE_PACKED_INDEX_WRITER SIMDJSON_RVV_ENABLE_PACKED_CONTROL
+#endif
+#ifndef SIMDJSON_RVV_PACKED_INDEX_THRESHOLD
+#define SIMDJSON_RVV_PACKED_INDEX_THRESHOLD 64
+#endif
+
+// Count trailing zeroes without making Zbb a correctness requirement. When
+// Zbb is enabled the compiler maps the builtin to ctz; otherwise the small
+// binary-search sequence stays entirely in scalar integer code. `value` must
+// be non-zero.
+simdjson_really_inline uint32_t trailing_zeroes64(uint64_t value) noexcept {
+#if defined(__riscv_zbb)
+  return uint32_t(__builtin_ctzll(value));
+#else
+  uint32_t count = 0;
+  if ((value & uint64_t(0xffffffffu)) == 0) { count += 32; value >>= 32; }
+  if ((value & uint64_t(0xffffu)) == 0) { count += 16; value >>= 16; }
+  if ((value & uint64_t(0xffu)) == 0) { count += 8; value >>= 8; }
+  if ((value & uint64_t(0xfu)) == 0) { count += 4; value >>= 4; }
+  if ((value & uint64_t(0x3u)) == 0) { count += 2; value >>= 2; }
+  if ((value & uint64_t(0x1u)) == 0) { count += 1; }
+  return count;
+#endif
+}
+
 simdjson_inline size_t trim_partial_utf8(const uint8_t *buf, size_t len) noexcept {
   if (simdjson_unlikely(len < 3)) {
     switch (len) {
@@ -144,16 +173,58 @@ private:
     const size_t count = __riscv_vcpop_m_b4(structural, vl);
     if (simdjson_likely(count == 0)) { return; }
 
-    // Sparse fast path avoids setting up vid/vcompress for a single event.
-    if (simdjson_likely(count == 1)) {
-      const long index = __riscv_vfirst_m_b4(structural, vl);
-      *tail++ = base + uint32_t(index);
+    // W2 sparse/event writer. On current RVV implementations, especially the
+    // SpacemiT X60, high-LMUL vcompress can be far more expensive than mask
+    // operations plus a handful of scalar event extractions. Keep this path
+    // bounded by the number of actual structurals: it never scans bytes.
+    //
+    // The threshold is intentionally conservative until native benchmarks can
+    // tune the W2/W1 crossover. vmsof selects only the first active mask bit;
+    // XOR removes that bit while preserving all remaining event positions.
+    static constexpr size_t SPARSE_INDEX_THRESHOLD =
+        SIMDJSON_RVV_SPARSE_INDEX_THRESHOLD;
+    if (simdjson_likely(count <= SPARSE_INDEX_THRESHOLD)) {
+      vbool4_t pending = structural;
+      for (size_t i = 0; i < count; ++i) {
+        const long index = __riscv_vfirst_m_b4(pending, vl);
+        *tail++ = base + uint32_t(index);
+        const vbool4_t first = __riscv_vmsof_m_b4(pending, vl);
+        pending = __riscv_vmxor_mm_b4(pending, first, vl);
+      }
       return;
     }
 
-    // e32m8 and e8m2 have identical VLMAX. Generate output-width offsets
-    // directly, compact them under the Stage 1 predicate, add the chunk base,
-    // and store. This avoids the old u16 -> u32 widening path entirely.
+    // W1 packed-mask writer. Export the predicate once with vsm.v, enumerate
+    // set bits with scalar integer operations, and write absolute uint32_t
+    // indexes directly. This removes vid/vcompress from the medium-density
+    // regime while keeping a dense vector fallback below. At VLEN=256, the
+    // Stage 1 e8m2 chunk is exactly 64 bytes, so the complete structural mask
+    // fits in one uint64_t word.
+    static constexpr size_t PACKED_INDEX_THRESHOLD =
+        SIMDJSON_RVV_PACKED_INDEX_THRESHOLD;
+    if (SIMDJSON_RVV_ENABLE_PACKED_INDEX_WRITER &&
+        simdjson_likely(count <= PACKED_INDEX_THRESHOLD)) {
+      packed_mask_words bits{};
+      if (simdjson_likely(pack_mask(structural, vl, bits))) {
+        const size_t words = packed_word_count(vl);
+        for (size_t word_index = 0; word_index < words; ++word_index) {
+          uint64_t word = bits.words[word_index];
+          const uint32_t word_base =
+              base + uint32_t(word_index * size_t(64));
+          while (word != 0) {
+            const uint32_t bit = trailing_zeroes64(word);
+            *tail++ = word_base + bit;
+            word &= word - 1;
+          }
+        }
+        return;
+      }
+    }
+
+    // W0 dense vector writer. e32m8 and e8m2 have identical VLMAX, so
+    // output-width offsets can be compacted directly without widening. Keep
+    // this path for dense structural blocks where one vector compaction can
+    // amortize its relatively high setup/permutation cost.
     const vuint32m8_t lanes = __riscv_vid_v_u32m8(vl);
     const vuint32m8_t packed = __riscv_vcompress_vm_u32m8(lanes, structural, vl);
     const vuint32m8_t absolute = __riscv_vadd_vx_u32m8(packed, base, count);
@@ -182,13 +253,24 @@ private:
     const vbool4_t nonquote_scalar = __riscv_vmand_mm_b4(
         scalar, __riscv_vmnot_m_b4(quote, vl), vl);
 
-    const vuint8m2_t zero = __riscv_vmv_v_x_u8m2(0, vl);
-    const vuint8m2_t scalar_flags =
-        __riscv_vmerge_vxm_u8m2(zero, 1, nonquote_scalar, vl);
-    const vuint8m2_t follows_flags = __riscv_vslide1up_vx_u8m2(
-        scalar_flags, prev_nonquote_scalar ? 1 : 0, vl);
-    const vbool4_t follows_nonquote_scalar =
-        __riscv_vmsne_vx_u8m2_b4(follows_flags, 0, vl);
+    vbool4_t follows_nonquote_scalar;
+    bool last_nonquote_scalar = false;
+    if (simdjson_likely(shift_mask_left_one_packed(
+            nonquote_scalar, vl, prev_nonquote_scalar,
+            follows_nonquote_scalar, last_nonquote_scalar))) {
+      // Packed predicate shift: no element widening/slide is required.
+    } else {
+      // Fully scalable fallback for vector lengths above the packed-control
+      // optimization window or for non-little-endian targets.
+      const vuint8m2_t zero = __riscv_vmv_v_x_u8m2(0, vl);
+      const vuint8m2_t scalar_flags =
+          __riscv_vmerge_vxm_u8m2(zero, 1, nonquote_scalar, vl);
+      const vuint8m2_t follows_flags = __riscv_vslide1up_vx_u8m2(
+          scalar_flags, prev_nonquote_scalar ? 1 : 0, vl);
+      follows_nonquote_scalar =
+          __riscv_vmsne_vx_u8m2_b4(follows_flags, 0, vl);
+      last_nonquote_scalar = detail::mask_last(nonquote_scalar, vl);
+    }
 
     const vbool4_t scalar_start = __riscv_vmand_mm_b4(
         scalar, __riscv_vmnot_m_b4(follows_nonquote_scalar, vl), vl);
@@ -201,7 +283,7 @@ private:
     const vbool4_t bad_control = __riscv_vmand_mm_b4(control, inside, vl);
     unescaped_control_error |= detail::any(bad_control, vl);
 
-    prev_nonquote_scalar = detail::mask_last(nonquote_scalar, vl);
+    prev_nonquote_scalar = last_nonquote_scalar;
     write_indexes(structural, vl, base);
   }
 

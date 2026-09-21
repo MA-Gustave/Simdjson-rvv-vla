@@ -30,7 +30,7 @@ int main() {
       ok &= rvv_test::compare_dom("string-state-boundary-" + std::to_string(boundary), json);
     }
 
-    for (size_t run = 1; run <= 8; ++run) {
+    for (size_t run = 1; run <= 16; ++run) {
       std::string json = R"({"x":")";
       if (boundary > json.size() + run) {
         json.append(boundary - json.size() - run, 'a');

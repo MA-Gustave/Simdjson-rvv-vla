@@ -18,6 +18,22 @@ The harness builds:
   compiled at each fixed VLEN supported by the machine.
 - `upstream_fallback`: scalar fallback from the upstream build (control).
 
+For optimization attribution, `--vla-variants phase1` additionally builds
+isolated RVV-VLA candidates from the same worktree:
+
+- `vla_legacy`: packed control disabled, sparse writer reduced to the legacy
+  one-event behavior.
+- `vla_sparse_index`: sparse structural writer only.
+- `vla_packed_index`: structural `vsm.v` + scalar bit enumeration only.
+- `vla_sparse_escape`: sparse backslash-event path only.
+- `vla_packed_escape`: packed backslash algebra only.
+- `vla_packed_quote`: packed 64-bit quote prefix XOR only.
+- `vla_packed_shift`: packed scalar-start shift only.
+
+`current_vla` is always included as the fully composed candidate. This keeps
+the normal upstream comparison intact while making individual wins/regressions
+visible in the generated report.
+
 VLS variants larger than the hardware VLEN are skipped automatically.
 
 Measured kernels:
@@ -92,6 +108,19 @@ Normal baseline:
 
 ```bash
 python3 scripts/rvv/perf/bench_native.py all --profile standard
+```
+
+Phase-1 A/B run (recommended before changing defaults):
+
+```bash
+python3 scripts/rvv/perf/bench_native.py all --profile standard --vla-variants phase1
+```
+
+You can also select individual variants, for example:
+
+```bash
+python3 scripts/rvv/perf/bench_native.py all --profile quick \
+  --vla-variants legacy,packed-index,packed-quote
 ```
 
 Longer run for results you may want to publish:

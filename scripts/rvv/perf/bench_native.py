@@ -44,6 +44,77 @@ PROFILES = {
     },
 }
 
+# Isolated RVV-VLA control-plane candidates. `current` is always built so the
+# normal VLA-vs-upstream report remains stable. The phase1 preset adds one
+# candidate per optimization family, all relative to the same legacy control
+# plane, so native measurements can attribute wins/regressions instead of only
+# observing the fully composed result.
+VLA_VARIANTS: dict[str, dict[str, str]] = {
+    "current": {},
+    "legacy": {
+        "SIMDJSON_RVV_SPARSE_INDEX_THRESHOLD": "1",
+        "SIMDJSON_RVV_ENABLE_PACKED_INDEX_WRITER": "0",
+        "SIMDJSON_RVV_SPARSE_ESCAPE_THRESHOLD": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_ESCAPE": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_QUOTE": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_SHIFT": "0",
+    },
+    "sparse-index": {
+        "SIMDJSON_RVV_SPARSE_INDEX_THRESHOLD": "8",
+        "SIMDJSON_RVV_ENABLE_PACKED_INDEX_WRITER": "0",
+        "SIMDJSON_RVV_SPARSE_ESCAPE_THRESHOLD": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_ESCAPE": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_QUOTE": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_SHIFT": "0",
+    },
+    "packed-index": {
+        "SIMDJSON_RVV_SPARSE_INDEX_THRESHOLD": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_INDEX_WRITER": "1",
+        "SIMDJSON_RVV_PACKED_INDEX_THRESHOLD": "512",
+        "SIMDJSON_RVV_SPARSE_ESCAPE_THRESHOLD": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_ESCAPE": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_QUOTE": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_SHIFT": "0",
+    },
+    "sparse-escape": {
+        "SIMDJSON_RVV_SPARSE_INDEX_THRESHOLD": "1",
+        "SIMDJSON_RVV_ENABLE_PACKED_INDEX_WRITER": "0",
+        "SIMDJSON_RVV_SPARSE_ESCAPE_THRESHOLD": "2",
+        "SIMDJSON_RVV_ENABLE_PACKED_ESCAPE": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_QUOTE": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_SHIFT": "0",
+    },
+    "packed-escape": {
+        "SIMDJSON_RVV_SPARSE_INDEX_THRESHOLD": "1",
+        "SIMDJSON_RVV_ENABLE_PACKED_INDEX_WRITER": "0",
+        "SIMDJSON_RVV_SPARSE_ESCAPE_THRESHOLD": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_ESCAPE": "1",
+        "SIMDJSON_RVV_ENABLE_PACKED_QUOTE": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_SHIFT": "0",
+    },
+    "packed-quote": {
+        "SIMDJSON_RVV_SPARSE_INDEX_THRESHOLD": "1",
+        "SIMDJSON_RVV_ENABLE_PACKED_INDEX_WRITER": "0",
+        "SIMDJSON_RVV_SPARSE_ESCAPE_THRESHOLD": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_ESCAPE": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_QUOTE": "1",
+        "SIMDJSON_RVV_ENABLE_PACKED_SHIFT": "0",
+    },
+    "packed-shift": {
+        "SIMDJSON_RVV_SPARSE_INDEX_THRESHOLD": "1",
+        "SIMDJSON_RVV_ENABLE_PACKED_INDEX_WRITER": "0",
+        "SIMDJSON_RVV_SPARSE_ESCAPE_THRESHOLD": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_ESCAPE": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_QUOTE": "0",
+        "SIMDJSON_RVV_ENABLE_PACKED_SHIFT": "1",
+    },
+}
+
+PHASE1_VLA_VARIANTS = [
+    "legacy", "sparse-index", "packed-index", "sparse-escape",
+    "packed-escape", "packed-quote", "packed-shift",
+]
+
 def say(msg: str = "") -> None:
     print(msg, flush=True)
 
@@ -289,7 +360,8 @@ def prepare_upstream(workspace: Path) -> Path:
 def cmake_generator() -> list[str]:
     return ["-G", "Ninja"] if command_exists("ninja") else []
 
-def build_flags(compiler: str, mode: str, fixed_bits: int | None = None) -> list[str]:
+def build_flags(compiler: str, mode: str, fixed_bits: int | None = None,
+                extra_defines: dict[str, str] | None = None) -> list[str]:
     flags = ["-O3", "-DNDEBUG", "-mabi=lp64d"]
     if mode == "vla":
         flags += [
@@ -311,6 +383,8 @@ def build_flags(compiler: str, mode: str, fixed_bits: int | None = None) -> list
         raise ValueError(mode)
     if compiler == "clang":
         flags += ["--gcc-toolchain=/usr"]
+    if extra_defines:
+        flags += [f"-D{name}={value}" for name, value in sorted(extra_defines.items())]
     return flags
 
 def find_libsimdjson(build: Path) -> Path:
@@ -323,9 +397,10 @@ def find_libsimdjson(build: Path) -> Path:
     return matches[0]
 
 def build_one(source: Path, build: Path, bin_dir: Path, label: str,
-              compiler: str, mode: str, fixed_bits: int | None = None) -> dict[str, Any]:
+              compiler: str, mode: str, fixed_bits: int | None = None,
+              extra_defines: dict[str, str] | None = None) -> dict[str, Any]:
     cc, cxx = compiler_pair(compiler)
-    flags = build_flags(compiler, mode, fixed_bits)
+    flags = build_flags(compiler, mode, fixed_bits, extra_defines)
     flag_string = " ".join(flags)
     build.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
@@ -372,7 +447,25 @@ def build_one(source: Path, build: Path, bin_dir: Path, label: str,
         "flags": flag_string,
         "fixed_bits": fixed_bits,
         "mode": mode,
+        "defines": extra_defines or {},
     }
+
+def selected_vla_variants(spec: str) -> list[str]:
+    requested = [x.strip() for x in spec.split(",") if x.strip()]
+    expanded: list[str] = []
+    for name in requested:
+        if name == "phase1":
+            expanded.extend(PHASE1_VLA_VARIANTS)
+        elif name == "all":
+            expanded.extend(name for name in VLA_VARIANTS if name != "current")
+        elif name in VLA_VARIANTS:
+            expanded.append(name)
+        else:
+            valid = ", ".join([*VLA_VARIANTS.keys(), "phase1", "all"])
+            raise RuntimeError(f"unknown VLA variant {name!r}; choose from: {valid}")
+    # Keep the regular optimized build as the stable comparison/report anchor.
+    ordered = ["current", *expanded]
+    return list(dict.fromkeys(ordered))
 
 def prepare(args: argparse.Namespace, workspace: Path, meta: dict[str, Any]) -> dict[str, Any]:
     upstream = prepare_upstream(workspace)
@@ -382,11 +475,21 @@ def prepare(args: argparse.Namespace, workspace: Path, meta: dict[str, Any]) -> 
     bin_dir = workspace / "bin"
     candidates: list[dict[str, Any]] = []
 
-    current = build_one(
-        REPO_ROOT, builds / f"current-vla-{args.compiler}", bin_dir,
-        "current_vla", args.compiler, "vla"
-    )
-    candidates.append({**current, "impl": "rvv", "family": "current"})
+    current = None
+    for variant in selected_vla_variants(args.vla_variants):
+        label = "current_vla" if variant == "current" else f"vla_{variant.replace('-', '_')}"
+        build_name = f"{label.replace('_', '-')}-{args.compiler}"
+        built = build_one(
+            REPO_ROOT, builds / build_name, bin_dir,
+            label, args.compiler, "vla", extra_defines=VLA_VARIANTS[variant]
+        )
+        family = "current" if variant == "current" else "experiment"
+        candidates.append({**built, "impl": "rvv", "family": family,
+                           "variant": variant})
+        if variant == "current":
+            current = built
+    if current is None:
+        raise RuntimeError("internal error: current VLA candidate was not built")
     candidates.append({
         **current,
         "label": "current_fallback",
@@ -639,6 +742,9 @@ def make_report(workspace: Path, meta: dict[str, Any]) -> Path:
     upstream_candidates = sorted({
         r["candidate"] for r in rows if r["family"] == "upstream"
     })
+    experiment_candidates = sorted({
+        r["candidate"] for r in rows if r["family"] == "experiment"
+    })
 
     lines = []
     lines.append("# RVV-VLA native performance report")
@@ -687,6 +793,37 @@ def make_report(workspace: Path, meta: dict[str, Any]) -> Path:
             lines.append(f"Geometric-mean VLA/VLS speedup across these corpora: **{gm:.3f}x**.")
         lines.append("")
 
+    if experiment_candidates:
+        ab_baseline = "vla_legacy" if any(
+            r["candidate"] == "vla_legacy" for r in rows
+        ) else "current_vla"
+        lines.append("## RVV-VLA A/B variants")
+        lines.append("")
+        lines.append(
+            f"Ratios below are relative to `{ab_baseline}` on the same corpus/metric."
+        )
+        lines.append("")
+        for metric in metrics:
+            lines.append(f"### {metric}")
+            lines.append("")
+            lines.append("| Corpus | Variant | GB/s | Relative | MAD% |")
+            lines.append("|---|---|---:|---:|---:|")
+            for corpus in corpora:
+                base = idx.get((ab_baseline, corpus, metric))
+                if not base:
+                    continue
+                base_gbps = float(base["median_gbps"])
+                for candidate in ["current_vla", *experiment_candidates]:
+                    row = idx.get((candidate, corpus, metric))
+                    if not row:
+                        continue
+                    ratio = float(row["median_gbps"]) / base_gbps if base_gbps else float("nan")
+                    lines.append(
+                        f"| {corpus} | {candidate} | {float(row['median_gbps']):.3f} | "
+                        f"{ratio:.3f}x | {float(row['mad_percent']):.2f}% |"
+                    )
+            lines.append("")
+
     noisy = [r for r in rows if float(r["mad_percent"]) > 3.0]
     lines.append("## Noise check")
     lines.append("")
@@ -730,6 +867,13 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--parse-iterations", type=int)
     p.add_argument("--micro-gib", type=float)
     p.add_argument("--vls-bits", help="comma-separated subset of 128,256,512; default auto")
+    p.add_argument(
+        "--vla-variants", default="current",
+        help=("comma-separated VLA A/B variants. Names: current, legacy, "
+              "sparse-index, packed-index, sparse-escape, packed-escape, "
+              "packed-quote, packed-shift; presets: phase1, all. "
+              "current is always included."),
+    )
     p.add_argument("--append", action="store_true", help="append to existing raw.csv")
     p.add_argument("--allow-emulation", action="store_true",
                    help="debug harness under emulation; results are not valid performance data")
