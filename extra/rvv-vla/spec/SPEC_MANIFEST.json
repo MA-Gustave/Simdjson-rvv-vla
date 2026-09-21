@@ -1,0 +1,146 @@
+{
+  "authority": {
+    "manifest_role": "machine-readable preflight mirror",
+    "markdown_is_authoritative": true
+  },
+  "decision_ids": [
+    "D-001",
+    "D-002",
+    "D-003",
+    "D-004",
+    "D-010",
+    "D-011",
+    "D-012",
+    "D-020",
+    "D-021",
+    "D-022",
+    "D-023",
+    "D-030",
+    "D-040",
+    "D-041",
+    "D-042",
+    "D-043",
+    "D-050",
+    "D-051",
+    "D-060",
+    "D-061",
+    "D-070",
+    "D-071",
+    "D-080",
+    "D-081",
+    "D-082",
+    "D-083",
+    "D-090",
+    "D-091",
+    "D-092",
+    "D-093",
+    "D-094",
+    "D-095"
+  ],
+  "frozen_baseline": "simdjson v4.6.11",
+  "hypotheses": {
+    "H-CLASS-01": [
+      "direct_compare",
+      "table_gather",
+      "hybrid"
+    ],
+    "H-DISP-01": [
+      "evidence_based_priority"
+    ],
+    "H-ESC-01": [
+      "E0:no_backslash",
+      "E1:rare_event",
+      "E2:dense_vector",
+      "EA:adaptive"
+    ],
+    "H-IDX-01": [
+      "W1:vector_compaction",
+      "W2:sparse_event",
+      "W3:reference"
+    ],
+    "H-LMUL-01": [
+      "L1:e8m1",
+      "L2:e8m2",
+      "L4:optional"
+    ],
+    "H-MIN-01": [
+      "M1:vcompress",
+      "M2:run_event_copy"
+    ],
+    "H-QUOTE-01": [
+      "Q1:viota_prefix",
+      "Q2:alternative_scalable_prefix",
+      "QREF:reference"
+    ],
+    "H-U8-01": [
+      "U1:fused",
+      "U2:adjacent_pipelined",
+      "U3:separate_pass_reference"
+    ],
+    "H-U8-02": [
+      "standalone_lmul_candidates"
+    ],
+    "H-ZVBB-01": [
+      "optional_guarded_fastpath"
+    ]
+  },
+  "mandatory_docs": [
+    "00_START_HERE.md",
+    "01_PRODUCT_REQUIREMENTS.md",
+    "20_ALGORITHM_INVARIANTS.md",
+    "03_LOCKED_ARCHITECTURE.md",
+    "21_PERFORMANCE_HYPOTHESES.md",
+    "04_STAGE1_KERNEL.md",
+    "05_UTF8_MINIFY_STAGE2.md",
+    "06_RUNTIME_DISPATCH_BUILD_AMALGAMATION.md",
+    "08_CORRECTNESS_TESTING_FUZZING.md",
+    "09_PERFORMANCE_BENCHMARKING.md",
+    "11_AI_CODING_PROTOCOL.md",
+    "12_IMPLEMENTATION_WORKPACKAGES.md",
+    "24_PROJECT_STATE.md"
+  ],
+  "performance_evidence_requires_real_hardware": true,
+  "qemu_vlen_correctness": [
+    128,
+    256,
+    512,
+    1024
+  ],
+  "rebase_checkpoints": [
+    "R0:start",
+    "R1:after_correct_stage1_before_hardware",
+    "R2:before_final_hardware_publication",
+    "R3:before_upstream_pr"
+  ],
+  "reference_backend": "rvv_vls",
+  "spec_version": "1.1",
+  "stop_conditions": [
+    "source contradicts spec/invariant",
+    "required intrinsic or build mechanism unavailable",
+    "new public API required",
+    "locked decision change required",
+    "hypothesis promotion required without evidence",
+    "unplanned invasive generic change required",
+    "material upstream VLA implementation appears"
+  ],
+  "target_backend": "rvv",
+  "work_packages": [
+    "WP-00",
+    "WP-01",
+    "WP-02",
+    "WP-03",
+    "WP-04",
+    "WP-05",
+    "WP-06",
+    "WP-07",
+    "WP-08",
+    "WP-09",
+    "WP-10",
+    "WP-11",
+    "WP-12",
+    "WP-13",
+    "WP-14",
+    "WP-15"
+  ],
+  "working_branch": "feature/rvv-vla"
+}
