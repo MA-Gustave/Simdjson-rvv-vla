@@ -91,9 +91,33 @@ RVV_NATIVE_CLANG_CXX
 
 These variables are shared with the native performance harness.
 
+## Server control panel
+
+For normal server operation, the preferred entry point is now:
+
+```bash
+python3 scripts/rvv/server_control.py
+```
+
+This provides an interactive terminal menu without duplicating test logic. For
+an unattended first run, use the gated workflow:
+
+```bash
+python3 scripts/rvv/server_control.py --auto
+```
+
+`--auto` executes `doctor -> native RVV/VLEN preflight -> smoke -> phase1` and
+stops at the first blocking failure. It does not install packages or update Git
+implicitly. Direct scripted actions include `doctor`, `setup`, `sync`,
+`preflight`, `smoke`, `phase1`, `matrix`, `standard`, `publication` and
+`latest`. A control session produces `rvv-server-control-results.tar.gz`, which
+aggregates the compact child native-suite bundles and control/preflight logs.
+
+See `extra/rvv-vla/optimization/15_SERVER_CONTROL_PANEL.md`.
+
 ## One-command native VPS suite
 
-The recommended entry point for a new real RVV machine is:
+The lower-level non-interactive suite used by the control panel is:
 
 ```text
 scripts/rvv/native_suite.py
@@ -301,3 +325,4 @@ See:
 - `extra/rvv-vla/spec/23_BENCHMARK_EXPERIMENT_MATRIX.md`
 - `extra/rvv-vla/optimization/13_PACKED_INDEX_AND_AB_HARNESS.md`
 - `extra/rvv-vla/optimization/14_NATIVE_VPS_SUITE.md`
+- `extra/rvv-vla/optimization/15_SERVER_CONTROL_PANEL.md`

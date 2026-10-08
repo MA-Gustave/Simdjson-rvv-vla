@@ -1,0 +1,10 @@
+# simdjson-rvv-vla - SmartSnap ignore
+# Fichiers versionnés et distribués, mais générés à partir des sources canoniques.
+# On garde les scripts/README de singleheader dans le snapshot.
+
+.smartignore
+
+# Amalgamation générée: ~11.6 MiB de duplication dans le snapshot actuel.
+singleheader/simdjson.h
+singleheader/simdjson.cpp
+singleheader/amalgamation_report.html

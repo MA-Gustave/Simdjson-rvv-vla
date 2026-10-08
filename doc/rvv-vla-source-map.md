@@ -55,12 +55,13 @@
 
 ## Native VPS orchestration
 
-- `scripts/rvv/native_suite.py`
+- `scripts/rvv/server_control.py` — operator-facing interactive/CLI control panel, safe auto workflow, setup/sync helpers and aggregate control bundle.
+- `scripts/rvv/native_suite.py` — non-interactive validation/correctness/performance orchestrator used by the control panel.
 
-This is the recommended one-command entry point for a new real RVV host. It
-collects environment metadata, runs compiler/VLEN preflights, selected native
-correctness gates and the native performance harness, then produces a compact
-result bundle.
+The control panel is the recommended operator-facing entry point. It delegates
+the actual qualification/correctness/performance campaign to `native_suite.py`,
+which collects environment metadata, compiler/VLEN preflights, selected native
+correctness gates and native benchmark artifacts.
 
 ## Native performance lab
 
@@ -89,6 +90,7 @@ summary CSV, metadata and a Markdown report.
 - `extra/rvv-vla/optimization/00_START_HERE.md`
 - `extra/rvv-vla/optimization/13_PACKED_INDEX_AND_AB_HARNESS.md`
 - `extra/rvv-vla/optimization/14_NATIVE_VPS_SUITE.md`
+- `extra/rvv-vla/optimization/15_SERVER_CONTROL_PANEL.md`
 
 ## External diagnostics
 

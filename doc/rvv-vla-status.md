@@ -28,7 +28,7 @@ This document records only results that have actually been observed. It is not a
 | Upstream acceptance suite | **PASS** | GCC global: 89/89 tests pass at VLEN=128/256/512/1024. |
 | RepoDiag `rvv-full` | **PASS with warnings** | 9 PASS / 2 WARN / 0 FAIL / 0 ERROR. RVV levels R10/R20/R30/R40/R50 pass. |
 | RepoDiag `deep` | **PASS with warnings** | 10 PASS / 2 WARN / 0 FAIL / 0 ERROR. RVV levels R10/R20/R30/R40/R50 pass. |
-| Native VPS orchestration | PENDING | `scripts/rvv/native_suite.py` is prepared to qualify a real RVV host, run native correctness and collect benchmark logs; it has not yet been executed on target hardware. |
+| Native VPS orchestration | PENDING | `scripts/rvv/server_control.py` + `scripts/rvv/native_suite.py` are prepared to qualify a real RVV host, run native correctness/performance campaigns and collect shareable logs; they have not yet been executed on target hardware. |
 | Real RISC-V hardware correctness | PENDING | QEMU is still the completed correctness environment for this snapshot. |
 | Real hardware performance | PENDING | No performance claim is valid yet; native RVV 1.0 benchmarking is the next phase. |
 
@@ -210,25 +210,30 @@ The next phase is execution on real RISC-V Vector 1.0 hardware. The first
 target is expected to be a SpacemiT K1/X60 system with VLEN=256, such as
 cfarm95 / Banana Pi BPI-F3 or a native VPS exposing equivalent hardware.
 
-The prepared high-level entry point is:
+The prepared operator-facing entry point is:
 
 ```text
-scripts/rvv/native_suite.py
+scripts/rvv/server_control.py
 ```
+
+It orchestrates `scripts/rvv/native_suite.py`, which remains the non-interactive
+validation/correctness/performance engine.
 
 It snapshots the host, checks native `riscv64` execution, probes hardware VLEN,
 runs selected native correctness gates, invokes the existing native performance
 harness and writes a timestamped summary plus a compact result bundle. It is
 prepared for the first hardware run but has not yet produced hardware evidence.
 
-The recommended sequence on a new VPS is:
+The recommended first command on a new VPS is:
 
 ```bash
-python3 scripts/rvv/native_suite.py --preset smoke
-python3 scripts/rvv/native_suite.py --preset phase1
+python3 scripts/rvv/server_control.py --auto
 ```
 
-`smoke` performs the minimum GCC native correctness and current-VLA benchmark
+The gated auto policy runs doctor, compiled RVV/VLEN preflight, `smoke`, then
+`phase1`, stopping at the first blocking failure. Manual `smoke`/`phase1` remain
+available through either the control panel or `native_suite.py`. `smoke`
+performs the minimum GCC native correctness and current-VLA benchmark
 bring-up. `phase1` adds GCC dispatch, optional Clang global correctness and the
 full isolated phase-1 A/B benchmark under GCC. Broader `matrix` and `standard`
 presets are available after the quick run is stable.
@@ -248,10 +253,12 @@ The primary workloads are:
 - UTF-8 validation.
 
 The native suite stores raw CSV, median/MAD summaries, machine/compiler/Git
-metadata and one log per step. The shareable result artifact is:
+metadata and one log per step. Each campaign creates `rvv-native-results.tar.gz`;
+the server control layer aggregates those compact bundles with its doctor and
+control logs into the preferred shareable artifact:
 
 ```text
-rvv-native-results.tar.gz
+rvv-server-control-results.tar.gz
 ```
 
 The purpose of the first phase-1 run is to identify which second-wave
@@ -273,7 +280,9 @@ The native-suite update keeps one source of truth for each layer:
 - `scripts/rvv/run_tests.py` remains the correctness runner;
 - `scripts/rvv/perf/bench_native.py` remains the performance harness;
 - `scripts/rvv/native_suite.py` orchestrates qualification, correctness,
-  benchmarks and logging.
+  benchmarks and native result logging;
+- `scripts/rvv/server_control.py` is the operator-facing interactive/CLI layer
+  and safe gated automation entry point.
 
 On a native `riscv64` host, `run_tests.py` uses host `gcc/g++` or
 `clang/clang++` instead of requiring the cross-compiler executable names.
@@ -324,29 +333,28 @@ python ..\RepoDiagSimdjson\repodiag.py --target C:\mycode\Simdjson\simdjson-rvv-
 
 ## Native VPS commands (not yet executed)
 
-First bring-up:
+Preferred first automated server run:
 
 ```text
-python3 scripts/rvv/native_suite.py --preset smoke
+python3 scripts/rvv/server_control.py --auto
 ```
 
-Recommended phase-1 campaign:
+Interactive control panel:
 
 ```text
-python3 scripts/rvv/native_suite.py --preset phase1
+python3 scripts/rvv/server_control.py
 ```
 
-Broader matrix after the quick run is stable:
+Manual broader campaigns after the quick run is stable:
 
 ```text
-python3 scripts/rvv/native_suite.py --preset matrix
+python3 scripts/rvv/server_control.py matrix
+python3 scripts/rvv/server_control.py standard
+python3 scripts/rvv/server_control.py publication
 ```
 
-Normal longer benchmark campaign:
-
-```text
-python3 scripts/rvv/native_suite.py --preset standard
-```
+The lower-level `native_suite.py --preset ...` commands remain supported for
+CI-like or explicitly scripted runs.
 
 These commands remain **PENDING** until observed on real RVV hardware.
 

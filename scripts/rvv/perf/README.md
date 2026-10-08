@@ -73,6 +73,20 @@ sudo apt install -y git cmake ninja-build build-essential python3 file
 For the tested GCC path, GCC 14+ is expected.
 
 
+## Server control panel
+
+For interactive or unattended server operation, prefer the operator-facing
+control layer:
+
+```bash
+python3 scripts/rvv/server_control.py
+python3 scripts/rvv/server_control.py --auto
+```
+
+It delegates performance work back to this harness through `native_suite.py`,
+so benchmark definitions and report formats remain centralized here. See
+`extra/rvv-vla/optimization/15_SERVER_CONTROL_PANEL.md`.
+
 ## One-command VPS validation suite
 
 For the first run on a new RVV VPS, use the higher-level orchestrator from the

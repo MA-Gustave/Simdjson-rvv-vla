@@ -107,6 +107,7 @@ Do not implement all ideas at once. Preserve attribution of wins and regressions
 - `12_FIRST_WAVE_IMPLEMENTED.md` — implemented optimization candidates awaiting native promotion evidence.
 - `13_PACKED_INDEX_AND_AB_HARNESS.md` — packed structural writer + isolated native A/B variants.
 - `14_NATIVE_VPS_SUITE.md` — one-command native VPS qualification, correctness matrix and benchmark logging.
+- `15_SERVER_CONTROL_PANEL.md` — interactive/scripted server control panel, gated auto workflow and shareable session bundle.
 - `SOURCES.md` — external references used by this plan.
 
 ## Non-goals

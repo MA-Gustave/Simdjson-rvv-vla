@@ -82,7 +82,6 @@ objs
 *.out
 *.app
 
-
 # CMake files that may be specific to our installation
 
 # Build outputs
@@ -110,3 +109,10 @@ objs
 
 # External RepoDiag runtime evidence
 /.repodiag/
+
+# Local helper tooling / scratch backups
+GitSink.bat
+/SmartSnap.pyw
+*.bak
+*.bak-*
+*.bak_*
